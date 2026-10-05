@@ -58,3 +58,29 @@ jobs:
 
       - name: Build image with Podman
         run: podman build -f Containerfile -t money-assistant:ci .
+
+      - name: Run image against Postgres and check /healthz
+        run: |
+          podman pod create --name ma-smoke -p 8000:8000
+          podman run -d --pod ma-smoke --name ma-smoke-db \
+            -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=money \
+            docker.io/library/postgres:16
+          for i in $(seq 1 30); do
+            podman exec ma-smoke-db pg_isready -h 127.0.0.1 -U postgres -d money && break
+            sleep 2
+          done
+          podman run -d --pod ma-smoke --name ma-smoke-app \
+            -e SECRET_KEY=ci-only-not-a-secret \
+            -e ALLOWED_HOSTS=localhost,127.0.0.1 \
+            -e DATABASE_URL=postgres://postgres:dev@127.0.0.1:5432/money \
+            money-assistant:ci
+          for i in $(seq 1 30); do
+            if body=$(curl -fsS http://localhost:8000/healthz); then
+              echo "$body"
+              test "$body" = '{"status": "ok", "db": "ok"}'
+              exit 0
+            fi
+            sleep 2
+          done
+          podman logs ma-smoke-app
+          exit 1
