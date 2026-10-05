@@ -218,3 +218,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# money-assistant
+.env
+.claude/
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+data/real/
+*.sqlite3
+staticfiles/
